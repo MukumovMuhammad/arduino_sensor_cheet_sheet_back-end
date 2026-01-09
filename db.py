@@ -1,25 +1,52 @@
 import sqlite3 
-from ArduinoSensorITem import Sensor
-conn = sqlite3.connect('database.db')
-cursor = conn.cursor()
+from typing import List
+from ArduinoSensorITem import Sensor 
 
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS sensors (
-    id INTEGER PRIMARY KEY,
-    title text,
-    context text,
-    code text
-)
-''')
-conn.commit()
+DATABASE_PATH = "database.db"
 
 
-def add_new_arduino_sensor(item: Sensor):
-    cursor.execute("INSERT INTO sensors VALUES (?,?,?)", item.title, item.context, item.code)
+
+def get_db() -> sqlite3.Connection:
+    """Creates a new database connection for each request."""
+    conn = sqlite3.connect(DATABASE_PATH)
+    try:
+        yield conn
+    finally:
+
+        conn.close()
+
+# --- Database Initialization ---
+
+def create_sensor_table():
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS sensors (
+        id INTEGER PRIMARY KEY,
+        title text,
+        context text,
+        code text
+    )
+    ''')
     conn.commit()
+    conn.close()
 
-def get_all_sensors():
+create_sensor_table()
+
+
+
+def add_new_arduino_sensor(item: Sensor, db_connection: sqlite3.Connection):
+    """Inserts a new sensor record using the provided connection."""
+    cursor = db_connection.cursor()
+
+    cursor.execute("INSERT INTO sensors (title, context, code) VALUES (?,?,?)", 
+                   (item.title, item.context, item.code))
+    db_connection.commit()
+
+
+def fetch_all_sensors(db_connection: sqlite3.Connection) -> List[Sensor]:
     items = []
+    cursor = db_connection.cursor()
     cursor.execute("SELECT * FROM sensors")
     all_sensors = cursor.fetchall()
 
@@ -27,4 +54,4 @@ def get_all_sensors():
         items.append(Sensor(id=i[0], title=i[1], context=i[2], code=i[3]))
     
     return items
-    
+
