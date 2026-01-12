@@ -1,18 +1,19 @@
 from typing import Annotated
 from fastapi import Depends, Form, UploadFile, HTTPException, FastAPI
 from ArduinoSensorITem import Sensor
+from fastapi.staticfiles import StaticFiles
 from db import *
 import shutil
 import os
 import glob
 import base64
 
-UPLOAD_DIR = "uploaded_images"
+UPLOAD_DIR = "images"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app = FastAPI()
 
-
+app.mount(f"/{UPLOAD_DIR}", StaticFiles(directory=UPLOAD_DIR), name=UPLOAD_DIR)
 
 @app.get("/")
 def read_root():
@@ -27,40 +28,37 @@ async def add_new_sensor(
     picture: UploadFile, 
     db_conn: sqlite3.Connection = Depends(get_db)
 ):
-    item = Sensor(title, context, code) 
-    item_id = add_new_arduino_sensor(item, db_conn)
+    
 
     file_extension = os.path.splitext(picture.filename)[1]
     if file_extension.lower() not in ['.jpg', '.jpeg', '.png', '.gif']:
         raise HTTPException(status_code=400, detail="Invalid image format")
-        delete_sensor(item_id, db_conn)
         return {
         "status": False, 
         "message": "this extension cannot be stored!",
-        "item_id": item_id
         }
 
-    file_location = os.path.join(UPLOAD_DIR, str(item_id) + file_extension)
+    file_location = os.path.join(UPLOAD_DIR, picture.filename)
     try:
         with open(file_location, "wb") as buffer:
 
             shutil.copyfileobj(picture.file, buffer) 
-    except:
-        delete_sensor(item_id, db_conn)
     finally:
 
         await picture.close() 
-    
+
+    item = Sensor(title, context, code, file_location) 
+    add_new_arduino_sensor(item, db_conn)
     return {
         "status": True, 
-        "message": "New Item is added!",
-        "item_id": item_id
+        "message": "New Item is added!"
     }
 
 @app.get("/get_all_sensors")
 def get_all_sensors(db_conn: sqlite3.Connection = Depends(get_db)):
     items = fetch_all_sensors(db_conn)
     return {"status": True, "message": "Data has been fetched" , "items" : items}
+
 
 @app.get("/get_sensor_image")
 def get_sensor_image(image_id: int):

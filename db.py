@@ -25,7 +25,8 @@ def create_sensor_table():
         id INTEGER PRIMARY KEY,
         title text,
         context text,
-        code text
+        code text,
+        image_path text
     )
     ''')
     conn.commit()
@@ -39,12 +40,9 @@ def add_new_arduino_sensor(item: Sensor, db_connection: sqlite3.Connection):
     """Inserts a new sensor record using the provided connection."""
     cursor = db_connection.cursor()
 
-    cursor.execute("INSERT INTO sensors (title, context, code) VALUES (?,?,?)", 
-                   (item.title, item.context, item.code))
+    cursor.execute("INSERT INTO sensors (title, context, code,image_path ) VALUES (?,?,?,?)", 
+                   (item.title, item.context, item.code, item.image_path))
     db_connection.commit()
-
-    sensor_id = cursor.lastrowid
-    return sensor_id
 
     
 
@@ -55,7 +53,7 @@ def fetch_all_sensors(db_connection: sqlite3.Connection) -> List[Sensor]:
     all_sensors = cursor.fetchall()    
 
     for i in all_sensors:
-        items.append(Sensor(id=i[0], title=i[1], context=i[2], code=i[3]))
+        items.append(Sensor(id=i[0], title=i[1], context=i[2], code=i[3], image_path=i[4]))
     
     return items
 
