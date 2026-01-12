@@ -25,8 +25,7 @@ def create_sensor_table():
         id INTEGER PRIMARY KEY,
         title text,
         context text,
-        code text,
-        imagePath text
+        code text
     )
     ''')
     conn.commit()
@@ -40,19 +39,35 @@ def add_new_arduino_sensor(item: Sensor, db_connection: sqlite3.Connection):
     """Inserts a new sensor record using the provided connection."""
     cursor = db_connection.cursor()
 
-    cursor.execute("INSERT INTO sensors (title, context, code, imagePath) VALUES (?,?,?,?)", 
-                   (item.title, item.context, item.code, item.image_path))
+    cursor.execute("INSERT INTO sensors (title, context, code) VALUES (?,?,?)", 
+                   (item.title, item.context, item.code))
     db_connection.commit()
 
+    sensor_id = cursor.lastrowid
+    return sensor_id
+
+    
 
 def fetch_all_sensors(db_connection: sqlite3.Connection) -> List[Sensor]:
     items = []
     cursor = db_connection.cursor()
     cursor.execute("SELECT * FROM sensors")
-    all_sensors = cursor.fetchall()
+    all_sensors = cursor.fetchall()    
 
     for i in all_sensors:
-        items.append(Sensor(id=i[0], title=i[1], context=i[2], code=i[3], image_path=i[4]))
+        items.append(Sensor(id=i[0], title=i[1], context=i[2], code=i[3]))
     
     return items
 
+
+def delete_sensor(sensor_id: int, db_connection: sqlite3.Connection):
+    cursor = db_connection.cursor()
+
+    cursor.execute(
+        "DELETE FROM sensors WHERE id = ?",
+        (sensor_id,)
+    )
+
+    db_connection.commit()
+
+    return cursor.rowcount
