@@ -5,15 +5,18 @@ from fastapi.staticfiles import StaticFiles
 from db import *
 import shutil
 import os
-import glob
-import base64
 
-UPLOAD_DIR = "images"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+scheme_imgs_dir = "scheme_imgs"
+title_imgs_dir = "title_imgs"
+os.makedirs(scheme_imgs_dir, exist_ok=True)
+os.makedirs(title_imgs_dir, exist_ok=True)
 
 app = FastAPI()
 
-app.mount(f"/{UPLOAD_DIR}", StaticFiles(directory=UPLOAD_DIR), name=UPLOAD_DIR)
+app.mount(f"/{scheme_imgs_dir}", StaticFiles(directory=scheme_imgs_dir), name=scheme_imgs_dir)
+app.mount(f"/{title_imgs_dir}", StaticFiles(directory=title_imgs_dir), name=title_imgs_dir)
+
 
 @app.get("/")
 def read_root():
@@ -25,29 +28,34 @@ async def add_new_sensor(
     title: Annotated[str, Form()], 
     context: Annotated[str, Form()], 
     code: Annotated[str, Form()], 
-    picture: UploadFile, 
+    title_img: UploadFile, 
+    scheme_img: UploadFile,
     db_conn: sqlite3.Connection = Depends(get_db)
-):
-    
+    ):
 
-    file_extension = os.path.splitext(picture.filename)[1]
-    if file_extension.lower() not in ['.jpg', '.jpeg', '.png', '.gif']:
+    title_ext = os.path.splitext(title_img.filename)[1]
+    scheme_ext = os.path.splitext(scheme_img.filename)[1]
+    if title_ext.lower() not in ['.jpg', '.jpeg', '.png', '.gif']:
         raise HTTPException(status_code=400, detail="Invalid image format")
-        return {
-        "status": False, 
-        "message": "this extension cannot be stored!",
-        }
-
-    file_location = os.path.join(UPLOAD_DIR, picture.filename)
+    #Yes yes I am just making a copy and same check! I am too lazy to make it all in one condition!
+    # This works fine! So leave it!
+    if scheme_ext.lower() not in ['.jpg', '.jpeg', '.png', '.gif']:
+        raise HTTPException(status_code=400, detail="Invalid image format")
+    
+    title_loc = os.path.join(title_imgs_dir, title_img.filename)
+    scheme_loc = os.path.join(scheme_imgs_dir, scheme_img.filename)
     try:
-        with open(file_location, "wb") as buffer:
-
-            shutil.copyfileobj(picture.file, buffer) 
+        with open(title_loc, "wb") as buffer:
+            shutil.copyfileobj(title_img.file, buffer) 
+        
+        with open(scheme_loc, "wb") as buffer:
+            shutil.copyfileobj(scheme_img.file, buffer) 
     finally:
 
-        await picture.close() 
+        await title_img.close() 
+        await scheme_img.close() 
 
-    item = Sensor(title, context, code, file_location) 
+    item = Sensor(title, context, code, title_loc, scheme_loc) 
     add_new_arduino_sensor(item, db_conn)
     return {
         "status": True, 
@@ -59,22 +67,3 @@ def get_all_sensors(db_conn: sqlite3.Connection = Depends(get_db)):
     items = fetch_all_sensors(db_conn)
     return {"status": True, "message": "Data has been fetched" , "items" : items}
 
-
-@app.get("/get_sensor_image")
-def get_sensor_image(image_id: int):
-    files = glob.glob(f"{UPLOAD_DIR}/{image_id}.*")
-
-    if not files:
-        return {"error": "Image not found"}
-
-    image_path = files[0]  # take first match
-
-    with open(image_path, "rb") as img:
-        encoded = base64.b64encode(img.read()).decode("utf-8")
-
-    extension = image_path.split(".")[-1]
-
-    return {
-        "image_base64": encoded,
-        "extension": extension
-    }
